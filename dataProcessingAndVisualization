@@ -1,0 +1,59 @@
+## for statistical tests
+import scipy
+import statsmodels.formula.api as smf
+import statsmodels.api as sm
+
+import pandas as pd
+
+df1 = pd.read_csv("COP6284 Midterm Exam Patient Data.csv",usecols=["Patient Zipcode","PRIMARY Diagnosis","Patient Gender","Patient Age (in years)","Telehealth Experience","Telehealth Visit", "Number of Visit"])
+
+df1.rename(columns = {'Patient Zipcode':'Zipcode','PRIMARY Diagnosis':'Diagnosis','Patient Gender':'Gender','Patient Age (in years)':'Age','Telehealth Experience':'telehealthExperience','Telehealth Visit':'telehealthVisit', 'Number of Visit':'totalVisit'}, inplace = True) #change column name
+df1.head()
+
+
+# Check if there are any null values
+print(df1.isnull().sum())
+
+df2 = pd.read_csv("COP6284 Midterm Exam Zipcode Data.csv")
+df2.head()
+
+print(df2.isnull().sum())
+
+df1_grouped = df1.groupby(['Zipcode','Diagnosis','Gender','telehealthExperience']).agg({'telehealthVisit': ['sum'],'totalVisit':['sum']})
+df1_grouped.head()
+
+from pandasql import sqldf
+q = "SELECT df1.Zipcode, df1.Diagnosis, df1.Gender, df1.telehealthExperience, sum(df1.telehealthVisit) as telehealthVisit, sum(df1.totalVisit) as totalVisit, df2.RuralUrban, df2.[%Broadband] as Broadband, df2.[%NH-White] AS nhWhite, df2.[%Hispanic] as hispanic, df2.[%Black] as Black, df2.[%LessThanhighSchool] as LessThanHighSchool,df2.[%Highschool] as HighSchool,df2.[%associate] as Associate,df2.[%Bachelor] as Bachelor, df2.[%Unemployed] as Unemployed  FROM df1 JOIN df2 ON df1.Zipcode = df2.Zipcode Where df1.Gender = 'F' GROUP BY df1.Zipcode, df1.Diagnosis, df1.Gender, df1.telehealthExperience, df2.RuralUrban,df2.[%Broadband],df2.[%NH-White], df2.[%Hispanic], df2.[%Black], df2.[%LessThanhighSchool],df2.[%Highschool],df2.[%associate],df2.[%Bachelor], df2.[%Unemployed] ORDER BY df1.Zipcode asc"
+t1 = sqldf(q, globals())
+t1.head()
+
+t1["p_Telehealth"] = round(t1["telehealthVisit"]/t1["totalVisit"]*100, 2)
+t1.head()
+
+grouped = t1.groupby('Zipcode')
+t1.head()
+
+t1.describe()
+
+# Get the subset data for analysis
+
+data = t1[['Diagnosis','telehealthExperience','telehealthVisit', 'totalVisit', 'Broadband','nhWhite','hispanic','Black','LessThanHighSchool','HighSchool','Associate','Bachelor','Unemployed','p_Telehealth']]
+
+# Visulize the variables
+%matplotlib inline
+import matplotlib.pyplot as plt
+data.hist(bins=100, figsize=(20,15))
+plt.show()
+
+q1=data.quantile(0.25)
+q3=data.quantile(0.75)
+IQR=q3-q1
+not_outliers = data[~((data<(q1-1.5*IQR)) | (data>(q3+1.5*IQR)))]
+outliers_dropped = not_outliers.dropna() #reset_index()
+outliers_dropped.describe()
+
+# Visualize the data after dropping outliers
+%matplotlib inline
+import matplotlib.pyplot as plt
+outliers_dropped.hist(bins=100, figsize=(20,15))
+plt.show()
